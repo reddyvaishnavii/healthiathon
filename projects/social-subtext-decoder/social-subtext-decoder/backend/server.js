@@ -4,6 +4,8 @@ import helmet from 'helmet'
 import morgan from 'morgan'
 import rateLimit from 'express-rate-limit'
 import dotenv from 'dotenv'
+import { createServer } from 'http'
+import { Server } from 'socket.io'
 
 import decodeRoutes from './routes/decode.js'
 import historyRoutes from './routes/history.js'
@@ -104,10 +106,77 @@ app.use((err, req, res, next) => {
   })
 })
 
+// ─── HTTP Server + Socket.io ────────────────────────────────────
+const httpServer = createServer(app)
+
+const io = new Server(httpServer, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
+})
+
+// ─── WebSocket Event Handlers ──────────────────────────────────
+io.on('connection', (socket) => {
+  const sessionId = socket.handshake.headers['x-session-id'] || socket.id
+  
+  console.log(`✅ Client connected: ${socket.id} (session: ${sessionId})`)
+  
+  // ── Conversation mode events ──
+  socket.on('conversation:start', (data, callback) => {
+    console.log(`🎥 Conversation started for session: ${sessionId}`, data)
+    socket.emit('conversation:ready', { status: 'ok', sessionId })
+    if (callback) callback({ success: true })
+  })
+  
+  socket.on('frame:send', (data, callback) => {
+    // data = { videoFrame: base64, audioChunk: PCMdata, timestamp }
+    console.log(`📥 Frame received:`, {
+      sessionId,
+      hasVideo: !!data.videoFrame,
+      videoSize: data.videoFrame?.length || 0,
+      hasAudio: !!data.audioChunk,
+      timestamp: data.timestamp
+    })
+    
+    // TODO: Process frame through emotion + speech services
+    // For now, send dummy response
+    socket.emit('frame:processed', {
+      emotion: { label: 'Happy', confidence: 0.85 },
+      tone: { label: 'Friendly' },
+      interpretation: 'The person seems happy and friendly.',
+      suggestedResponses: ['That sounds great!', 'I appreciate that.'],
+      latency: Math.random() * 500 + 100
+    })
+    
+    if (callback) callback({ success: true })
+  })
+  
+  socket.on('conversation:end', (data, callback) => {
+    console.log(`🏁 Conversation ended for session: ${sessionId}`)
+    socket.emit('conversation:summary', { 
+      status: 'ok', 
+      framesProcessed: 0,
+      duration: 0
+    })
+    if (callback) callback({ success: true })
+  })
+  
+  socket.on('disconnect', () => {
+    console.log(`❌ Client disconnected: ${socket.id}`)
+  })
+  
+  socket.on('error', (error) => {
+    console.error(`❌ Socket error for ${socket.id}:`, error)
+  })
+})
+
 // ─── Start ─────────────────────────────────────────────────────
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`\n🚀 Server running on http://localhost:${PORT}`)
-  console.log(`📡 Environment: ${process.env.NODE_ENV || 'development'}`)
+  console.log(`📡 WebSocket: ws://localhost:${PORT}`)
+  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`)
   console.log(`🔑 Claude API: ${process.env.ANTHROPIC_API_KEY ? '✅ configured' : '❌ MISSING'}`)
   console.log(`🌐 Allowed origins: ${allowedOrigins.join(', ')}\n`)
 })

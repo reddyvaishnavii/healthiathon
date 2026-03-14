@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom'
-import { Brain, History, Sparkles } from 'lucide-react'
+import { Brain, History, Sparkles, Camera } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 export default function Layout() {
@@ -34,6 +34,20 @@ export default function Layout() {
             >
               <Sparkles className="w-3.5 h-3.5" />
               Decode
+            </NavLink>
+
+            <NavLink
+              to="/live"
+              className={({ isActive }) =>
+                `flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-200
+                ${isActive
+                  ? 'bg-primary-50 text-primary-600'
+                  : 'text-soft-muted hover:text-gray-700 hover:bg-soft-border'
+                }`
+              }
+            >
+              <Camera className="w-3.5 h-3.5" />
+              Live
             </NavLink>
 
             <NavLink
