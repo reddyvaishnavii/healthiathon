@@ -22,14 +22,10 @@ export async function listPracticeSituations(req, res) {
 // ─── Create a New Practice Session ────────────────────────────────────
 export async function createPracticeSession(req, res) {
   try {
-    const { sessionId, situationType, situationDescription, outputMode, avatarEnabled } = req.body
+    const { sessionId, situationType = 'custom', situationDescription, outputMode, avatarEnabled } = req.body
 
     if (!sessionId) {
       return res.status(400).json({ success: false, error: 'sessionId required' })
-    }
-
-    if (!situationType) {
-      return res.status(400).json({ success: false, error: 'situationType required' })
     }
 
     // Get or create user
@@ -60,6 +56,22 @@ export async function createPracticeSession(req, res) {
 
     const sessionData = sessionResult.rows[0]
 
+    // Generate initial message for the practice session
+    let initialMessage = "Hello! I'm your practice partner. How can I help you today?"
+    let facialExpression = "smile"
+    let animation = "TalkingOne"
+    
+    try {
+      const aiResponse = await generateAIResponse('', [], situationType, situationDescription || '')
+      if (aiResponse && aiResponse.response) {
+        initialMessage = aiResponse.response
+        facialExpression = aiResponse.facialExpression || "smile"
+        animation = aiResponse.animation || "TalkingOne"
+      }
+    } catch (aiError) {
+      console.warn('⚠️ Could not generate AI initial message, using default:', aiError.message)
+    }
+
     res.json({
       success: true,
       data: {
@@ -68,6 +80,9 @@ export async function createPracticeSession(req, res) {
         situationType,
         outputMode: outputMode || 'voice',
         avatarEnabled: avatarEnabled !== false,
+        initialMessage,
+        facialExpression,
+        animation,
       },
     })
 
@@ -80,14 +95,14 @@ export async function createPracticeSession(req, res) {
 // ─── Send User Message in Practice Session ────────────────────────────
 export async function sendPracticeMessage(req, res) {
   try {
-    const { userMessage, conversationHistory = [] } = req.body
-    console.log('📨 sendPracticeMessage called:', { userMessage })
+    const { practiceSessionId, userMessage, conversationHistory = [] } = req.body
+    console.log('📨 sendPracticeMessage called:', { practiceSessionId, userMessage })
 
     if (!userMessage) {
       return res.status(400).json({ success: false, error: 'userMessage is required' })
     }
 
-    // Generate AI response directly — no DB session lookup needed
+    // Generate AI response directly — no DB session lookup needed for custom conversations
     const aiResult = await generateAIResponse(
       userMessage,
       conversationHistory,
@@ -104,9 +119,11 @@ export async function sendPracticeMessage(req, res) {
     res.json({
       success: true,
       data: {
-        response: aiResult.response,
+        aiResponse: aiResult.response,
         suggestions: aiResult.suggestions || [],
         isFallback: aiResult.isFallback || false,
+        facialExpression: aiResult.facialExpression || "smile",
+        animation: aiResult.animation || "TalkingOne",
       },
     })
 

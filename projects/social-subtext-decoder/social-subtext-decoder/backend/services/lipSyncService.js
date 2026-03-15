@@ -23,11 +23,11 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 // Generate Phonemes using Rhubarb
 // ─────────────────────────────────────────────────────────────
 
-export async function generatePhonemes({ message, messageIndex }) {
+export async function generatePhonemes({ message, messageIndex, sessionId = '' }) {
   try {
-    const fileName = `audios/message_${messageIndex}.mp3`
-    const wavFile = `audios/message_${messageIndex}.wav`
-    const jsonFile = `audios/message_${messageIndex}.json`
+    const fileName = `audios/message_${sessionId}_${messageIndex}.mp3`
+    const wavFile = `audios/message_${sessionId}_${messageIndex}.wav`
+    const jsonFile = `audios/message_${sessionId}_${messageIndex}.json`
 
     console.log(`🎵 Converting to WAV for message ${messageIndex}`)
     await convertAudioToWav({ inputPath: fileName, outputPath: wavFile })
@@ -92,11 +92,14 @@ export async function generateLipSync({ messages }) {
       return messages
     }
 
+    // Generate unique session ID for this batch to avoid file collisions
+    const sessionId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
     // Step 1: Generate TTS for all messages
-    console.log(`🎤 Generating TTS for ${messages.length} messages...`)
+    console.log(`🎤 Generating TTS for ${messages.length} messages... (Session: ${sessionId})`)
     await Promise.all(
       messages.map(async (message, index) => {
-        const fileName = `audios/message_${index}.mp3`
+        const fileName = `audios/message_${sessionId}_${index}.mp3`
 
         for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
           try {
@@ -120,8 +123,8 @@ export async function generateLipSync({ messages }) {
     console.log(`🔄 Generating lip sync data...`)
     await Promise.all(
       messages.map(async (message, index) => {
-        const fileName = `audios/message_${index}.mp3`
-        const jsonFile = `audios/message_${index}.json`
+        const fileName = `audios/message_${sessionId}_${index}.mp3`
+        const jsonFile = `audios/message_${sessionId}_${index}.json`
 
         try {
           // Always get audio base64
@@ -130,7 +133,7 @@ export async function generateLipSync({ messages }) {
 
           // Try to get lip sync, but generate fallback if FFmpeg unavailable
           try {
-            await generatePhonemes({ message, messageIndex: index })
+            await generatePhonemes({ message, messageIndex: index, sessionId })
             message.lipsync = await readJsonTranscript({ fileName: jsonFile })
             console.log(`✅ Lip sync attachment complete for message ${index}`)
           } catch (ffmpegError) {

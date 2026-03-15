@@ -4,13 +4,11 @@ import { Loader, OrbitControls } from '@react-three/drei'
 import { useSpeechRecognition, useSpeechSynthesis } from '../hooks/useSpeechRecognition'
 import { Avatar3D } from '../components/Avatar3D'
 import { SpeechProvider, useSpeech } from '../hooks/useSpeechAvatar'
-import PracticeSituationSelector from '../components/PracticeSituationSelector'
-import PracticeChat from '../components/PracticeChat'
 
 export default function SpeechPracticePage() {
   console.log('🎯 SpeechPracticePage rendered')
   
-  const [mode, setMode] = useState('situations') // 'situations', 'practice', 'ended'
+  const [mode, setMode] = useState('practice') // Directly start in practice mode
   const [practiceSituation, setPracticeSituation] = useState(null)
   const [practiceSessionId, setPracticeSessionId] = useState(null)
   const [outputMode, setOutputMode] = useState('voice')
@@ -28,27 +26,27 @@ export default function SpeechPracticePage() {
   const { speak, isSpeaking } = useSpeechSynthesis()
   const sessionIdRef = useRef(localStorage.getItem('sessionId') || `session-${Date.now()}`)
 
-  // Initialize session ID
+  // Initialize session ID and start practice session on mount
   useEffect(() => {
     if (!localStorage.getItem('sessionId')) {
       localStorage.setItem('sessionId', sessionIdRef.current)
     }
+    // Automatically start a practice session when component mounts
+    handleStartPractice()
   }, [])
 
-  // Start practice session
-  const handleStartPractice = async (situation) => {
+  // Start practice session - no situation parameter needed
+  const handleStartPractice = async () => {
     try {
       setIsLoading(true)
-      setPracticeSituation(situation)
-      setMessages([])
-      console.log('🎯 Starting practice:', { situation: situation.id, sessionRef: sessionIdRef.current })
+      console.log('🎯 Starting custom practice session:', { sessionRef: sessionIdRef.current })
 
       const response = await fetch('http://localhost:3001/api/practice/session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId: sessionIdRef.current,
-          situationType: situation.id,
+          // No situationType - API will handle custom conversation
           outputMode,
           avatarEnabled,
         }),
@@ -67,8 +65,13 @@ export default function SpeechPracticePage() {
 
         // Speak initial message if voice mode
         if (outputMode !== 'text') {
-          setAiEmotion('happy')
-          await speak(data.data.initialMessage)
+          // Build message object with expression data from AI response
+          const initialMsg = {
+            text: data.data.initialMessage,
+            facialExpression: data.data.facialExpression || 'smile',
+            animation: data.data.animation || 'TalkingOne',
+          }
+          await speak(initialMsg)
         }
 
         setMode('practice')
@@ -107,64 +110,7 @@ export default function SpeechPracticePage() {
     }
   }
 
-  // Render situation selector
-  if (mode === 'situations') {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 p-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="mb-8">
-            <h1 className="text-4xl font-bold text-gray-900 mb-2">Speech Practice Mode</h1>
-            <p className="text-gray-600">Practice real-world conversations with our AI avatar</p>
-          </div>
-
-          {/* Settings */}
-          <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div>
-                <label className="font-semibold text-gray-700 mb-2 block">Output Mode</label>
-                <select
-                  value={outputMode}
-                  onChange={(e) => setOutputMode(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-4 py-2"
-                >
-                  <option value="voice">Voice Only</option>
-                  <option value="text">Text Only</option>
-                  <option value="both">Voice + Text</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="font-semibold text-gray-700 mb-2 block">Avatar</label>
-                <button
-                  onClick={() => setAvatarEnabled(!avatarEnabled)}
-                  className={`w-full py-2 px-4 rounded-lg font-medium transition-colors ${
-                    avatarEnabled
-                      ? 'bg-primary-500 text-white'
-                      : 'bg-gray-200 text-gray-700'
-                  }`}
-                >
-                  {avatarEnabled ? 'Enabled' : 'Disabled'}
-                </button>
-              </div>
-
-              <div>
-                <label className="font-semibold text-gray-700 mb-2 block">Status</label>
-                <div className="py-2 text-center text-gray-600">Ready to Start</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Situation Selector */}
-          <PracticeSituationSelector
-            onSelectSituation={handleStartPractice}
-            isLoading={isLoading}
-          />
-        </div>
-      </div>
-    )
-  }
-
-  // Render practice mode
+  // Render practice mode directly (no situations selector)
   if (mode === 'practice') {
     return (
       <div className="fixed inset-0 w-screen h-screen bg-black overflow-hidden m-0 p-0">
@@ -206,8 +152,8 @@ export default function SpeechPracticePage() {
                 <span className="font-semibold">{sessionStats.totalExchanges}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-600">Situation:</span>
-                <span className="font-semibold">{practiceSituation?.title}</span>
+                <span className="text-gray-600">Type:</span>
+                <span className="font-semibold">Custom AI Conversation</span>
               </div>
             </div>
           </div>
@@ -215,13 +161,14 @@ export default function SpeechPracticePage() {
           <div className="space-y-3">
             <button
               onClick={() => {
-                setMode('situations')
+                setMode('practice')
                 setPracticeSessionId(null)
                 setMessages([])
+                handleStartPractice()
               }}
               className="w-full bg-primary-500 text-white py-3 rounded-lg font-semibold hover:bg-primary-600"
             >
-              Practice Another Situation
+              Start New Conversation
             </button>
             <button
               onClick={() => window.location.href = '/'}
@@ -291,9 +238,15 @@ function PracticePageContent({
         const aiMsg = data.data.aiResponse || 'I understand.'
         console.log('✅ AI Response received:', aiMsg)
         
-        // Send AI response through TTS (which will handle lip-sync and audio)
-        console.log('🎤 Calling tts() with message:', aiMsg)
-        await tts(aiMsg)
+        // Build full message object with expression and animation data
+        const fullMessage = {
+          text: aiMsg,
+          facialExpression: data.data.facialExpression || 'smile',
+          animation: data.data.animation || 'TalkingOne',
+        }
+        
+        console.log('🎤 Calling tts() with full message:', fullMessage)
+        await tts(fullMessage)
         console.log('✅ TTS completed, message should be in queue')
       } else {
         throw new Error(data.error || 'Unknown error')
@@ -338,7 +291,7 @@ function PracticePageContent({
       {/* Top Header - Compact */}
       <div className="absolute top-4 left-4 right-4 z-20 flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-white">{practiceSituation?.title}</h1>
+          <h1 className="text-2xl font-bold text-white">Practice Conversation</h1>
           <p className="text-gray-300 text-sm">
             {isListening ? '🎤 Listening...' : 'Ready to speak'}
           </p>
