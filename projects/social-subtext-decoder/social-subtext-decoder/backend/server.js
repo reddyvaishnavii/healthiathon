@@ -63,6 +63,15 @@ app.use(limiter)
 app.use(express.json({ limit: '10kb' }))
 app.use(express.urlencoded({ extended: true }))
 
+// ─── Static File Serving (Audio & Media) ────────────────────
+app.use('/audios', express.static('audios', {
+  type: 'audio/wav',
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Content-Type', 'audio/wav')
+  }
+}))
+
 // ─── Logging ───────────────────────────────────────────────────
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'))

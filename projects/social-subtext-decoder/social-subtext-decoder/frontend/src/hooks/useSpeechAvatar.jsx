@@ -129,8 +129,13 @@ export const SpeechProvider = ({ children }) => {
       const responseData = json.messages
       if (responseData && Array.isArray(responseData)) {
         console.log('✅ TTS messages received:', responseData.length, 'items')
-        responseData.forEach((msg, idx) => {
-          console.log(`  Message ${idx}:`, {
+        // Add unique ID to each message for tracking
+        const messagesWithIds = responseData.map((msg, idx) => ({
+          ...msg,
+          _id: `msg_${Date.now()}_${idx}` // unique ID to match audio with subtitle
+        }))
+        messagesWithIds.forEach((msg, idx) => {
+          console.log(`  Message ${idx} (${msg._id}):`, {
             text: msg.text?.substring(0, 40),
             hasAudio: !!msg.audio,
             audioLength: msg.audio?.length || 0,
@@ -139,7 +144,7 @@ export const SpeechProvider = ({ children }) => {
             firstMouthCue: msg.lipsync?.mouthCues?.[0],
           })
         })
-        setMessages((messages) => [...messages, ...responseData])
+        setMessages((messages) => [...messages, ...messagesWithIds])
       } else {
         throw new Error("Invalid response: expected { messages: [...] }")
       }
@@ -154,13 +159,29 @@ export const SpeechProvider = ({ children }) => {
   }
 
   const onMessagePlayed = () => {
-    setMessages((messages) => messages.slice(1))
+    console.log('✅ Message audio finished, removing from queue')
+    setMessages((messages) => {
+      const nextMessages = messages.slice(1)
+      console.log(`📊 Messages remaining in queue: ${nextMessages.length}`)
+      if (nextMessages.length > 0) {
+        console.log(`📌 Next message in queue:`, nextMessages[0].text?.substring(0, 40))
+      }
+      return nextMessages
+    })
   }
 
+  // Update displayed message only when messages array updates
   useEffect(() => {
     if (messages.length > 0) {
+      console.log('📝 Displaying message from queue:', {
+        id: messages[0]._id,
+        text: messages[0].text?.substring(0, 40),
+        queuePosition: 1,
+        totalQueued: messages.length
+      })
       setMessage(messages[0])
     } else {
+      console.log('✨ Message queue empty')
       setMessage(null)
     }
   }, [messages])

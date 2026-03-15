@@ -40,6 +40,7 @@ export function Avatar(props) {
       return
     }
     console.log('🎬 Avatar3D: New message received:', {
+      messageId: message._id,
       text: message.text?.substring(0, 30),
       hasAudio: !!message.audio,
       hasLipsync: !!message.lipsync,
@@ -53,29 +54,34 @@ export function Avatar(props) {
     
     if (message.audio) {
       try {
-        console.log('🎵 Avatar3D: Creating audio from base64, length:', message.audio.length)
-        const audio = new Audio("data:audio/mp3;base64," + message.audio)
+        console.log('🎵 Avatar3D: Creating audio from base64 for message', message._id, 'length:', message.audio.length)
+        // Support both MP3 and WAV formats
+        const audioMimeType = message.audio.startsWith('/9j/') ? 'audio/mpeg' : 'audio/wav'
+        const audio = new Audio(`data:${audioMimeType};base64,${message.audio}`)
         setAudio(audio)
-        audio.onended = onMessagePlayed
+        audio.onended = () => {
+          console.log('✅ Audio finished for message', message._id)
+          onMessagePlayed()
+        }
         audio.onerror = () => {
-          console.warn("Avatar: audio failed to play, advancing to next message")
+          console.warn("Avatar: audio failed to play for message", message._id, "advancing to next message")
           onMessagePlayed()
         }
         
         // Delay audio start by 300ms to let user see the text appears first
         setTimeout(() => {
-          console.log('▶️ Avatar3D: Starting audio playback (delayed 300ms)')
+          console.log('▶️ Avatar3D: Starting audio playback for message', message._id, '(delayed 300ms)')
           audio.play().catch((err) => {
-            console.warn("Avatar: play() failed", err)
+            console.warn("Avatar: play() failed for message", message._id, err)
             onMessagePlayed()
           })
         }, 300)
       } catch (err) {
-        console.warn("Avatar: invalid audio data", err)
+        console.warn("Avatar: invalid audio data for message", message._id, err)
         onMessagePlayed()
       }
     } else {
-      console.warn('⚠️ Avatar3D: No audio in message')
+      console.warn('⚠️ Avatar3D: No audio in message', message._id)
       setAudio(undefined)
       onMessagePlayed()
     }

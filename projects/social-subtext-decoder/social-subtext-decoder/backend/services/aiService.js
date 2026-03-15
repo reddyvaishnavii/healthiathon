@@ -61,6 +61,49 @@ Format:
 
 
 // ─────────────────────────────────────────────────────────────
+// Helper: Analyze sentiment and select facial expression
+// ─────────────────────────────────────────────────────────────
+
+function analyzeSentiment(text) {
+  const lowerText = text.toLowerCase()
+  
+  // Positive indicators
+  if (lowerText.match(/\b(great|good|excellent|perfect|love|wonderful|amazing|fantastic|awesome|happy|glad|pleased)\b/)) {
+    return "smile"
+  }
+  
+  // Negative/sad indicators
+  if (lowerText.match(/\b(sad|unhappy|upset|frustrated|angry|terrible|awful|hate|sorry|apologize|shame)\b/)) {
+    return "sad"
+  }
+  
+  // Surprised/interested indicators
+  if (lowerText.match(/\b(wow|surprise|shocked|really|seriously|what|why|interesting|really\?)\b/) || text.includes("?")) {
+    return "surprised"
+  }
+  
+  // Confused/thoughtful indicators
+  if (lowerText.match(/\b(confused|unclear|not sure|unsure|hmm|maybe|perhaps|think)\b/)) {
+    return "funnyFace"
+  }
+  
+  // Default to smile for friendliness
+  return "smile"
+}
+
+function selectAnimation(facialExpression) {
+  const animationMap = {
+    smile: "TalkingOne",
+    sad: "Defeated",
+    angry: "Angry",
+    surprised: "Surprised",
+    funnyFace: "ThoughtfulHeadShake",
+    default: "Idle",
+  }
+  return animationMap[facialExpression] || "TalkingOne"
+}
+
+// ─────────────────────────────────────────────────────────────
 // Generate AI Response
 // ─────────────────────────────────────────────────────────────
 
@@ -97,6 +140,7 @@ Respond now.
 `
 
     console.log("🤖 Generating Gemini response...")
+    console.log("📝 Prompt:", prompt.substring(0, 100) + "...")
 
     const result = await model.generateContent(prompt)
     const response = await result.response
@@ -131,7 +175,7 @@ Respond now.
       .map(s => String(s).trim())
       .filter(s => s.length > 0)
 
-    // Pad to 4 if Gemini returned fewer
+    // Pad to 4 if Claude returned fewer
     while (suggestions.length < 4) {
       const defaults = getDefaultSuggestions()
       const next = defaults.find(d => !suggestions.includes(d))
@@ -139,15 +183,29 @@ Respond now.
       else break
     }
 
+    // Analyze sentiment to determine facial expression and animation
+    const facialExpression = analyzeSentiment(reply)
+    const animation = selectAnimation(facialExpression)
+
+    console.log("😊 Expression Analysis:", {
+      text: reply.substring(0, 40) + "...",
+      facialExpression,
+      animation
+    })
+
     return {
       response: reply,
       suggestions,
-      isFallback: false
+      isFallback: false,
+      facialExpression,
+      animation
     }
 
   } catch (error) {
 
-    console.error("❌ Gemini error:", error.message)
+    console.error("❌ Claude error:", error.message)
+    console.error("Error status:", error.status)
+    console.error("Error details:", error)
     return getFallbackResponse(userMessage)
 
   }
@@ -169,11 +227,17 @@ function getFallbackResponse(userMessage = "") {
   ]
 
   const response = replies[Math.floor(Math.random() * replies.length)]
+  
+  // Analyze fallback response for expressions
+  const facialExpression = analyzeSentiment(response)
+  const animation = selectAnimation(facialExpression)
 
   return {
     response,
     suggestions: getDefaultSuggestions(),
-    isFallback: true
+    isFallback: true,
+    facialExpression,
+    animation
   }
 
 }

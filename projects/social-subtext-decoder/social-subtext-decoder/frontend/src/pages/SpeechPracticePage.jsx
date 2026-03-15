@@ -5,6 +5,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useSpeechRecognition, useSpeechSynthesis } from '../hooks/useSpeechRecognition'
+import { Avatar3D } from '../components/Avatar3D'
+import { SpeechProvider, useSpeech } from '../hooks/useSpeechAvatar'
 import { useGameState } from '@hooks/useGameState'
 import AvatarComponent  from '../components/AvatarComponent'
 import PracticeChat     from '../components/PracticeChat'
@@ -111,6 +113,12 @@ function MilestoneToast({ milestone, onDone }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────
 export default function SpeechPracticePage() {
+  console.log('🎯 SpeechPracticePage rendered')
+  
+  const [mode, setMode] = useState('practice') // Directly start in practice mode
+  const [practiceSituation, setPracticeSituation] = useState(null)
+  const [practiceSessionId, setPracticeSessionId] = useState(null)
+  const [outputMode, setOutputMode] = useState('voice')
 
   const [messages, setMessages]       = useState([])
   const [suggestions, setSuggestions] = useState([])
@@ -146,6 +154,7 @@ export default function SpeechPracticePage() {
 
   const { speak, isSpeaking } = useSpeechSynthesis()
 
+  // Initialize session ID and start practice session on mount
   const sessionIdRef = useRef(
     localStorage.getItem('sessionId') || `session-${Date.now()}`
   )
@@ -154,6 +163,47 @@ export default function SpeechPracticePage() {
     if (!localStorage.getItem('sessionId')) {
       localStorage.setItem('sessionId', sessionIdRef.current)
     }
+    // Automatically start a practice session when component mounts
+    handleStartPractice()
+  }, [])
+
+  // Start practice session - no situation parameter needed
+  const handleStartPractice = async () => {
+    try {
+      setIsLoading(true)
+      console.log('🎯 Starting custom practice session:', { sessionRef: sessionIdRef.current })
+
+      const response = await fetch('http://localhost:3001/api/practice/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: sessionIdRef.current,
+          // No situationType - API will handle custom conversation
+          outputMode,
+          avatarEnabled,
+        }),
+      })
+
+      const data = await response.json()
+      console.log('📥 Session created response:', data)
+
+      if (data.success && data.data) {
+        const sessionId = data.data.practiceSessionId
+        console.log('✅ Practice session ID set:', sessionId)
+        setPracticeSessionId(sessionId)
+        setMessages([
+          { sender: 'ai', text: data.data.initialMessage, id: 1 }
+        ])
+
+        // Speak initial message if voice mode
+        if (outputMode !== 'text') {
+          // Build message object with expression data from AI response
+          const initialMsg = {
+            text: data.data.initialMessage,
+            facialExpression: data.data.facialExpression || 'smile',
+            animation: data.data.animation || 'TalkingOne',
+          }
+          await speak(initialMsg)
     // Reset session combo on mount
     resetSessionCombo()
   }, [])
@@ -273,6 +323,66 @@ export default function SpeechPracticePage() {
     setShowSummary(true)
   }
 
+  // Render practice mode directly (no situations selector)
+  if (mode === 'practice') {
+    return (
+      <div className="fixed inset-0 w-screen h-screen bg-black overflow-hidden m-0 p-0">
+        {/* Full Screen Avatar */}
+        <SpeechProvider>
+          <PracticePageContent 
+            practiceSituation={practiceSituation}
+            practiceSessionId={practiceSessionId}
+            isLoading={isLoading}
+            isListening={isListening}
+            typedMessage={typedMessage}
+            setTypedMessage={setTypedMessage}
+            handleEndPractice={handleEndPractice}
+            startListening={startListening}
+            stopListening={stopListening}
+            resetTranscript={resetTranscript}
+          />
+        </SpeechProvider>
+      </div>
+    )
+  }
+
+  // Render session ended
+  if (mode === 'ended' && sessionStats) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 p-4 flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow-lg p-8 max-w-md w-full text-center">
+          <div className="text-6xl mb-4">🎉</div>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Great Practice Session!</h2>
+          
+          <div className="bg-gray-50 rounded-lg p-6 mb-6 text-left">
+            <div className="space-y-3">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Duration:</span>
+                <span className="font-semibold">{Math.floor(sessionStats.duration / 60)}m {sessionStats.duration % 60}s</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Exchanges:</span>
+                <span className="font-semibold">{sessionStats.totalExchanges}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Type:</span>
+                <span className="font-semibold">Custom AI Conversation</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <button
+              onClick={() => {
+                setMode('practice')
+                setPracticeSessionId(null)
+                setMessages([])
+                handleStartPractice()
+              }}
+              className="w-full bg-primary-500 text-white py-3 rounded-lg font-semibold hover:bg-primary-600"
+            >
+              Start New Conversation
+            </button>
   const handleSummaryClose = () => {
     setShowSummary(false)
     setMessages([])
@@ -318,6 +428,86 @@ export default function SpeechPracticePage() {
             </button>
           )}
         </div>
+      </div>
+    )
+  }
+
+  // Fallback - should not reach here
+  console.warn('⚠️ SpeechPracticePage reached fallback (no mode matched)')
+  return (
+    <div style={{ padding: '20px', color: '#red', fontSize: '18px' }}>
+      ❌ Debug: Mode = {mode}, sessionStats = {sessionStats ? 'exists' : 'null'}
+    </div>
+  )
+}
+
+// Practice Page Content Component - inside SpeechProvider
+function PracticePageContent({
+  practiceSituation,
+  practiceSessionId,
+  isLoading: isLoadingProp,
+  isListening,
+  typedMessage,
+  setTypedMessage,
+  handleEndPractice,
+  startListening,
+  stopListening,
+  resetTranscript,
+}) {
+  const { message, tts } = useSpeech()
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleSendMessage = async (userMessage) => {
+    if (!userMessage.trim() || !practiceSessionId) {
+      console.warn('⚠️ Cannot send:', { msg: userMessage.trim(), sessionId: practiceSessionId })
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      console.log('📤 Sending user message:', userMessage)
+
+      // Send to backend
+      const response = await fetch('http://localhost:3001/api/practice/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          practiceSessionId,
+          userMessage,
+        }),
+      })
+
+      const data = await response.json()
+      console.log('📦 Backend response:', data)
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${data.error || response.statusText}`)
+      }
+
+      if (data.success && data.data) {
+        const aiMsg = data.data.aiResponse || 'I understand.'
+        console.log('✅ AI Response received:', aiMsg)
+        
+        // Build full message object with expression and animation data
+        const fullMessage = {
+          text: aiMsg,
+          facialExpression: data.data.facialExpression || 'smile',
+          animation: data.data.animation || 'TalkingOne',
+        }
+        
+        console.log('🎤 Calling tts() with full message:', fullMessage)
+        await tts(fullMessage)
+        console.log('✅ TTS completed, message should be in queue')
+      } else {
+        throw new Error(data.error || 'Unknown error')
+      }
+    } catch (error) {
+      console.error('❌ Error:', error.message)
+      alert(error.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
         {/* ── XP Bar ── */}
         {userMsgCount > 0 && (
@@ -358,6 +548,21 @@ export default function SpeechPracticePage() {
           </div>
         </div>
 
+      {/* Top Header - Compact */}
+      <div className="absolute top-4 left-4 right-4 z-20 flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Practice Conversation</h1>
+          <p className="text-gray-300 text-sm">
+            {isListening ? '🎤 Listening...' : 'Ready to speak'}
+          </p>
+        </div>
+        <button
+          onClick={handleEndPractice}
+          className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 font-medium"
+        >
+          End Session
+        </button>
+      </div>
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
