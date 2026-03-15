@@ -1,10 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
+import { Canvas } from '@react-three/fiber'
+import { Loader, OrbitControls } from '@react-three/drei'
 import { useSpeechRecognition, useSpeechSynthesis } from '../hooks/useSpeechRecognition'
-import AvatarComponent from '../components/AvatarComponent'
+import { Avatar3D } from '../components/Avatar3D'
+import { SpeechProvider, useSpeech } from '../hooks/useSpeechAvatar'
 import PracticeSituationSelector from '../components/PracticeSituationSelector'
 import PracticeChat from '../components/PracticeChat'
 
 export default function SpeechPracticePage() {
+  console.log('🎯 SpeechPracticePage rendered')
+  
   const [mode, setMode] = useState('situations') // 'situations', 'practice', 'ended'
   const [practiceSituation, setPracticeSituation] = useState(null)
   const [practiceSessionId, setPracticeSessionId] = useState(null)
@@ -15,6 +20,9 @@ export default function SpeechPracticePage() {
   const [userEmotion, setUserEmotion] = useState('neutral')
   const [aiEmotion, setAiEmotion] = useState('neutral')
   const [sessionStats, setSessionStats] = useState(null)
+  const [typedMessage, setTypedMessage] = useState('')
+  
+  console.log('📊 Current mode:', mode)
 
   const { transcript, isListening, startListening, stopListening, resetTranscript, useFallback } = useSpeechRecognition()
   const { speak, isSpeaking } = useSpeechSynthesis()
@@ -76,81 +84,8 @@ export default function SpeechPracticePage() {
     }
   }
 
-  // Handle sending message
-  const handleSendMessage = async (userMessage) => {
-    console.log('handleSendMessage called:', { userMessage: userMessage.trim(), practiceSessionId })
-    if (!userMessage.trim() || !practiceSessionId) {
-      console.warn('⚠️ Cannot send - empty message or no session:', { hasMessage: !!userMessage.trim(), sessionId: practiceSessionId })
-      return
-    }
-
-    try {
-      setIsLoading(true)
-      console.log('📤 Sending message:', { userMessage, practiceSessionId })
-
-      // Add user message to chat
-      const userMsgId = messages.length + 1
-      setMessages(prev => [...prev, { sender: 'user', text: userMessage, id: userMsgId }])
-      setUserEmotion('focused')
-
-      // Send to backend
-      console.log('🌐 POST http://localhost:3001/api/practice/message')
-      const response = await fetch('http://localhost:3001/api/practice/message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          practiceSessionId,
-          userMessage,
-        }),
-      })
-
-      console.log('📬 Response status:', response.status)
-      const data = await response.json()
-      console.log('📦 Response data:', data)
-
-      if (!response.ok) {
-        console.error('❌ HTTP Error:', response.status)
-        throw new Error(`HTTP ${response.status}: ${data.error || response.statusText}`)
-      }
-
-      if (data.success && data.data) {
-        // Add AI response
-        const aiMsgId = userMsgId + 1
-        const aiMsg = data.data.aiResponse || 'I understand.'
-        setMessages(prev => [...prev, { sender: 'ai', text: aiMsg, id: aiMsgId }])
-        console.log('✅ AI Response:', aiMsg)
-
-        // Update emotion
-        setAiEmotion(data.data.isFallback ? 'concerned' : 'happy')
-
-        // Speak if voice mode
-        if (outputMode !== 'text') {
-          await speak(aiMsg)
-        }
-      } else {
-        console.error('❌ API returned failure:', data.error)
-        throw new Error(data.error || 'Unknown error')
-      }
-    } catch (error) {
-      console.error('❌ Error:', error.message)
-      setMessages(prev => [...prev, { 
-        sender: 'system', 
-        text: `Error: ${error.message}`,
-        id: messages.length + 1 
-      }])
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // Handle voice input
-  useEffect(() => {
-    if (transcript && transcript.trim() && !isLoading) {
-      console.log('📢 Voice transcript received:', transcript)
-      handleSendMessage(transcript)
-      resetTranscript()
-    }
-  }, [transcript, isLoading])
+  // Note: handleSendMessage is now defined inside PracticePageContent 
+  // so it can access the TTS function from the SpeechProvider context
 
   // End practice session
   const handleEndPractice = async () => {
@@ -232,52 +167,22 @@ export default function SpeechPracticePage() {
   // Render practice mode
   if (mode === 'practice') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary-50 to-secondary-50 p-4">
-        <div className="max-w-6xl mx-auto">
-          {/* Header */}
-          <div className="mb-6 flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">{practiceSituation?.title}</h1>
-              <p className="text-gray-600 text-sm">
-                {isListening ? '🎤 Listening...' : 'Ready to speak'}
-              </p>
-            </div>
-            <button
-              onClick={handleEndPractice}
-              className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 font-medium"
-            >
-              End Session
-            </button>
-          </div>
-
-          {/* Main Content */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Avatar Section */}
-            {avatarEnabled && (
-              <div className="lg:col-span-1">
-                <AvatarComponent
-                  emotion={aiEmotion}
-                  isSpeaking={isSpeaking}
-                  isListening={false}
-                />
-              </div>
-            )}
-
-            {/* Chat Section */}
-            <div className={avatarEnabled ? 'lg:col-span-2' : 'lg:col-span-3'}>
-              <PracticeChat
-                messages={messages}
-                isLoading={isLoading}
-                onSendMessage={handleSendMessage}
-                isListening={isListening}
-                onStartListening={startListening}
-                onStopListening={stopListening}
-                outputMode={outputMode}
-                useFallbackInput={useFallback}
-              />
-            </div>
-          </div>
-        </div>
+      <div className="fixed inset-0 w-screen h-screen bg-black overflow-hidden m-0 p-0">
+        {/* Full Screen Avatar */}
+        <SpeechProvider>
+          <PracticePageContent 
+            practiceSituation={practiceSituation}
+            practiceSessionId={practiceSessionId}
+            isLoading={isLoading}
+            isListening={isListening}
+            typedMessage={typedMessage}
+            setTypedMessage={setTypedMessage}
+            handleEndPractice={handleEndPractice}
+            startListening={startListening}
+            stopListening={stopListening}
+            resetTranscript={resetTranscript}
+          />
+        </SpeechProvider>
       </div>
     )
   }
@@ -330,5 +235,173 @@ export default function SpeechPracticePage() {
     )
   }
 
-  return null
+  // Fallback - should not reach here
+  console.warn('⚠️ SpeechPracticePage reached fallback (no mode matched)')
+  return (
+    <div style={{ padding: '20px', color: '#red', fontSize: '18px' }}>
+      ❌ Debug: Mode = {mode}, sessionStats = {sessionStats ? 'exists' : 'null'}
+    </div>
+  )
+}
+
+// Practice Page Content Component - inside SpeechProvider
+function PracticePageContent({
+  practiceSituation,
+  practiceSessionId,
+  isLoading: isLoadingProp,
+  isListening,
+  typedMessage,
+  setTypedMessage,
+  handleEndPractice,
+  startListening,
+  stopListening,
+  resetTranscript,
+}) {
+  const { message, tts } = useSpeech()
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleSendMessage = async (userMessage) => {
+    if (!userMessage.trim() || !practiceSessionId) {
+      console.warn('⚠️ Cannot send:', { msg: userMessage.trim(), sessionId: practiceSessionId })
+      return
+    }
+
+    try {
+      setIsLoading(true)
+      console.log('📤 Sending user message:', userMessage)
+
+      // Send to backend
+      const response = await fetch('http://localhost:3001/api/practice/message', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          practiceSessionId,
+          userMessage,
+        }),
+      })
+
+      const data = await response.json()
+      console.log('📦 Backend response:', data)
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${data.error || response.statusText}`)
+      }
+
+      if (data.success && data.data) {
+        const aiMsg = data.data.aiResponse || 'I understand.'
+        console.log('✅ AI Response received:', aiMsg)
+        
+        // Send AI response through TTS (which will handle lip-sync and audio)
+        console.log('🎤 Calling tts() with message:', aiMsg)
+        await tts(aiMsg)
+        console.log('✅ TTS completed, message should be in queue')
+      } else {
+        throw new Error(data.error || 'Unknown error')
+      }
+    } catch (error) {
+      console.error('❌ Error:', error.message)
+      alert(error.message)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <>
+      <div className="absolute inset-0">
+        <Canvas
+          camera={{ position: [0, 0.6, 1.2], fov: 50 }}
+          style={{ width: '100%', height: '100%', backgroundColor: '#000' }}
+        >
+          <ambientLight intensity={0.7} />
+          <directionalLight position={[10, 10, 5]} intensity={1.2} />
+          <pointLight position={[-10, 10, 5]} intensity={0.8} />
+          <Avatar3D />
+          <OrbitControls
+            enableZoom={false}
+            enablePan={false}
+            enableRotate={false}
+            autoRotate={false}
+          />
+        </Canvas>
+      </div>
+
+      {/* Avatar Text Subtitle - Centered below avatar */}
+      {message && message.text && (
+        <div className="absolute bottom-40 left-0 right-0 z-10 flex justify-center">
+          <div className="bg-black bg-opacity-70 text-white px-8 py-4 rounded-xl max-w-2xl text-center text-lg font-medium">
+            {message.text}
+          </div>
+        </div>
+      )}
+
+      {/* Top Header - Compact */}
+      <div className="absolute top-4 left-4 right-4 z-20 flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-white">{practiceSituation?.title}</h1>
+          <p className="text-gray-300 text-sm">
+            {isListening ? '🎤 Listening...' : 'Ready to speak'}
+          </p>
+        </div>
+        <button
+          onClick={handleEndPractice}
+          className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 font-medium"
+        >
+          End Session
+        </button>
+      </div>
+
+      {/* Bottom Input Section */}
+      <div className="absolute bottom-0 left-0 right-0 z-20 bg-gradient-to-t from-black via-black to-transparent pt-8 pb-6">
+        <div className="max-w-2xl mx-auto px-4">
+          {/* Input Controls */}
+          <div className="flex gap-3">
+            <button
+              onClick={isListening ? stopListening : startListening}
+              disabled={isLoading}
+              className={`flex-1 py-3 px-6 rounded-lg font-semibold text-white text-lg transition-colors ${
+                isListening
+                  ? 'bg-red-500 hover:bg-red-600'
+                  : 'bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400'
+              }`}
+            >
+              {isListening ? '⏹ Stop & Send' : '🎤 Speak'}
+            </button>
+            
+            <input
+              type="text"
+              value={typedMessage}
+              onChange={(e) => setTypedMessage(e.target.value)} 
+              placeholder="Or type your message..."
+              className="flex-1 px-4 py-3 rounded-lg text-gray-900 placeholder-gray-500 border border-gray-300"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && typedMessage.trim()) {
+                  handleSendMessage(typedMessage)
+                  setTypedMessage('')
+                }
+              }}
+              disabled={isLoading}
+            />
+
+            <button
+              onClick={() => {
+                if (typedMessage.trim()) {
+                  handleSendMessage(typedMessage)
+                  setTypedMessage('')
+                }
+              }}
+              disabled={isLoading || !typedMessage.trim()}
+              className={`py-3 px-6 rounded-lg font-semibold text-white text-lg transition-colors ${
+                isLoading || !typedMessage.trim()
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-green-500 hover:bg-green-600'
+              }`}
+            >
+              Send
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
 }
