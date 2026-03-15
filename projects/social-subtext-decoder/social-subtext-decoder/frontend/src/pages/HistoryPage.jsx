@@ -1,10 +1,15 @@
+// HistoryPage.jsx — with gamification added
+// Changes: tone collection badge shelf, stats bar, "X/10 tones discovered"
+// All original code preserved — additions only
+
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { History, Trash2, ChevronDown, ChevronUp, RotateCcw } from 'lucide-react'
-import { useSession }  from '@hooks/useSession'
-import { useHistory }  from '@hooks/useHistory'
-import ErrorBanner     from '@components/ErrorBanner'
+import { useSession }    from '@hooks/useSession'
+import { useHistory }    from '@hooks/useHistory'
+import { useGameState }  from '@hooks/useGameState'
+import ErrorBanner       from '@components/ErrorBanner'
 import clsx from 'clsx'
 
 const TONE_COLORS = {
@@ -20,6 +25,74 @@ const TONE_COLORS = {
   'Joking':          'bg-teal-50   text-teal-700',
 }
 
+// ── Tone Collection Shelf ─────────────────────────────────────────────
+function ToneCollectionShelf({ collected, all }) {
+  return (
+    <div className="card p-5">
+      <div className="flex items-center justify-between mb-3">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+          Tone Collection
+        </p>
+        <span className="text-xs font-bold text-violet-600">
+          {collected.length}/{all.length} unlocked
+        </span>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-1.5 bg-gray-100 rounded-full mb-4 overflow-hidden">
+        <motion.div
+          className="h-full bg-gradient-to-r from-violet-400 to-fuchsia-400 rounded-full"
+          initial={{ width: 0 }}
+          animate={{ width: `${Math.round((collected.length / all.length) * 100)}%` }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
+        />
+      </div>
+
+      {/* Badge grid */}
+      <div className="flex flex-wrap gap-2">
+        {all.map(tone => {
+          const isUnlocked = collected.includes(tone)
+          const colorClass = TONE_COLORS[tone] || 'bg-gray-100 text-gray-600'
+          return (
+            <motion.span
+              key={tone}
+              initial={false}
+              animate={{ opacity: isUnlocked ? 1 : 0.35, scale: isUnlocked ? 1 : 0.95 }}
+              className={clsx(
+                'text-xs font-medium px-2.5 py-1 rounded-full transition-all',
+                isUnlocked ? colorClass : 'bg-gray-100 text-gray-400'
+              )}
+            >
+              {isUnlocked ? '✓ ' : '🔒 '}{tone}
+            </motion.span>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+// ── Stats Bar ─────────────────────────────────────────────────────────
+function StatsBar({ totalDecoded, streak, maxCombo }) {
+  const stats = [
+    { label: 'Decoded',    value: totalDecoded, emoji: '🧠' },
+    { label: 'Day streak', value: streak,        emoji: '🔥' },
+    { label: 'Best combo', value: maxCombo,      emoji: '⚡' },
+  ]
+  return (
+    <div className="grid grid-cols-3 gap-3">
+      {stats.map(s => (
+        <div key={s.label} className="card p-4 text-center">
+          <p className="text-xl mb-0.5">{s.emoji}</p>
+          <p className="text-xl font-bold text-gray-900">{s.value}</p>
+          <p className="text-xs text-gray-400">{s.label}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── HistoryItem (unchanged from original) ────────────────────────────
 function HistoryItem({ entry, onDelete }) {
   const [expanded, setExpanded] = useState(false)
   const { phrase, decoded, savedAt } = entry
@@ -36,7 +109,6 @@ function HistoryItem({ entry, onDelete }) {
       exit={{ opacity: 0, x: -20 }}
       className="card overflow-hidden"
     >
-      {/* Header row */}
       <div
         className="flex items-start justify-between gap-3 px-5 py-4 cursor-pointer hover:bg-soft-bg transition-colors"
         onClick={() => setExpanded(v => !v)}
@@ -63,7 +135,6 @@ function HistoryItem({ entry, onDelete }) {
         </div>
       </div>
 
-      {/* Expanded details */}
       <AnimatePresence>
         {expanded && (
           <motion.div
@@ -96,13 +167,16 @@ function HistoryItem({ entry, onDelete }) {
   )
 }
 
+// ── HistoryPage ───────────────────────────────────────────────────────
 export default function HistoryPage() {
   const sessionId = useSession()
   const { history, loading, error, remove, clear } = useHistory(sessionId)
+  const { state, ALL_TONES } = useGameState()
   const navigate = useNavigate()
 
   return (
     <div className="space-y-5">
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -121,6 +195,19 @@ export default function HistoryPage() {
           </button>
         )}
       </div>
+
+      {/* ── GAMIFICATION: Stats bar ── */}
+      <StatsBar
+        totalDecoded={state.totalDecoded}
+        streak={state.streak}
+        maxCombo={state.maxCombo}
+      />
+
+      {/* ── GAMIFICATION: Tone collection shelf ── */}
+      <ToneCollectionShelf
+        collected={state.toneCollection}
+        all={ALL_TONES}
+      />
 
       {/* Error */}
       {error && <ErrorBanner message={error} />}
@@ -145,7 +232,9 @@ export default function HistoryPage() {
           </div>
           <div>
             <p className="font-semibold text-gray-800">No history yet</p>
-            <p className="text-soft-muted text-sm mt-1">Phrases you decode will appear here.</p>
+            <p className="text-soft-muted text-sm mt-1">
+              Decode phrases to discover all {ALL_TONES.length} tones!
+            </p>
           </div>
           <button
             onClick={() => navigate('/')}

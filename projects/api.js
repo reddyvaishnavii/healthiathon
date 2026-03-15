@@ -1,6 +1,5 @@
 const BASE_URL = import.meta.env.VITE_API_URL || '/api'
 
-// ─── Helper ────────────────────────────────────────────────────
 async function request(path, options = {}, sessionId = '') {
   const res = await fetch(`${BASE_URL}${path}`, {
     headers: {
@@ -20,7 +19,6 @@ async function request(path, options = {}, sessionId = '') {
   return data
 }
 
-// ─── Decode ────────────────────────────────────────────────────
 export async function decodePhrase(phrase, context = '', sessionId) {
   return request(
     '/decode',
@@ -32,7 +30,6 @@ export async function decodePhrase(phrase, context = '', sessionId) {
   )
 }
 
-// ─── History ───────────────────────────────────────────────────
 export async function fetchHistory(sessionId) {
   return request('/history', {}, sessionId)
 }

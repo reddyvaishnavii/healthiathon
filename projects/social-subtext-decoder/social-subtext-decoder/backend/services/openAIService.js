@@ -2,7 +2,7 @@
 // OpenAI Service: Avatar responses with structured output
 // ═══════════════════════════════════════════════════════════════════════
 
-import { ChatOpenAI } from "@langchain/openai"
+//import { ChatOpenAI } from "@langchain/openai"
 import { ChatPromptTemplate } from "@langchain/core/prompts"
 import { StructuredOutputParser } from "langchain/output_parsers"
 import { z } from "zod"
@@ -51,12 +51,12 @@ const parser = StructuredOutputParser.fromZodSchema(
 // Initialize LLM
 // ─────────────────────────────────────────────────────────────
 
-const model = new ChatOpenAI({
-  openAIApiKey: OPENAI_API_KEY,
-  modelName: OPENAI_MODEL,
-  temperature: 0.7,
-  maxTokens: 500,
-})
+// const model = new ChatOpenAI({
+//   openAIApiKey: OPENAI_API_KEY,
+//   modelName: OPENAI_MODEL,
+//   temperature: 0.7,
+//   maxTokens: 500,
+// })
 
 // ─────────────────────────────────────────────────────────────
 // Helper: Analyze sentiment and select appropriate expressions
