@@ -5,22 +5,39 @@ export default function PracticeSituationSelector({ onSelectSituation, isLoading
   const [customInput, setCustomInput] = useState('')
   const [showCustom, setShowCustom] = useState(false)
   const [error, setError] = useState('')
+  const [loadingTimeout, setLoadingTimeout] = useState(false)
 
   useEffect(() => {
     fetchSituations()
+    
+    // Set a timeout to show a loading message if it takes too long
+    const timeout = setTimeout(() => {
+      setLoadingTimeout(true)
+    }, 3000)
+    
+    return () => clearTimeout(timeout)
   }, [])
 
   const fetchSituations = async () => {
     try {
+      console.log('📡 Fetching situations from backend...')
       const response = await fetch('http://localhost:3001/api/practice/situations')
+      console.log('📬 Response status:', response.status)
+      
       const data = await response.json()
+      console.log('📦 Situations data:', data)
 
       if (data.success) {
+        console.log('✅ Situations loaded:', data.data.length, 'items')
         setSituations(data.data)
+        setLoadingTimeout(false)
+      } else {
+        throw new Error(data.error || 'Failed to load situations')
       }
     } catch (error) {
-      console.error('Error fetching situations:', error)
-      setError('Failed to load situations. Please try again.')
+      console.error('❌ Error fetching situations:', error)
+      setError('Failed to load situations. Server might be down. ' + error.message)
+      setLoadingTimeout(false)
     }
   }
 
@@ -48,6 +65,34 @@ export default function PracticeSituationSelector({ onSelectSituation, isLoading
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
         {error}
+        <button onClick={fetchSituations} className="ml-4 underline">Retry</button>
+      </div>
+    )
+  }
+
+  if (loadingTimeout && situations.length === 0) {
+    return (
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-8 text-center">
+        <div className="text-yellow-800 mb-4">
+          ⏳ Loading situations... (taking longer than expected)
+        </div>
+        <div className="text-yellow-700 text-sm">
+          Make sure the backend server is running at http://localhost:3001
+        </div>
+        <button 
+          onClick={fetchSituations}
+          className="mt-4 px-4 py-2 bg-yellow-600 text-white rounded"
+        >
+          Retry Loading
+        </button>
+      </div>
+    )
+  }
+
+  if (situations.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        ⏳ Loading practice situations...
       </div>
     )
   }
