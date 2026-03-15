@@ -95,66 +95,8 @@ export default function PracticeSituationSelector({ onSelectSituation, isLoading
         </div>
       </div>
 
-      {/* Custom Situation */}
-      <div className="border-t-2 pt-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">✨ Custom Situation</h2>
-        
-        {!showCustom ? (
-          <button
-            onClick={() => setShowCustom(true)}
-            className="bg-gradient-to-r from-primary-500 to-secondary-500 text-white px-8 py-4 rounded-lg font-semibold hover:shadow-lg transition-all"
-          >
-            Create Your Own Situation
-          </button>
-        ) : (
-          <div className="bg-white rounded-lg shadow-md p-6 max-w-2xl">
-            <label className="block font-semibold text-gray-900 mb-2">
-              Describe Your Situation
-            </label>
-            <textarea
-              value={customInput}
-              onChange={(e) => {
-                setCustomInput(e.target.value)
-                setError('')
-              }}
-              placeholder="E.g., 'I need to confidently ask my boss for a raise' or 'How do I make friends at a new workplace?'"
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 mb-4 focus:outline-none focus:ring-2 focus:ring-primary-500 resize-none"
-              rows={4}
-            />
-            
-            <div className="flex gap-3">
-              <button
-                onClick={handleCustomSituation}
-                disabled={isLoading || !customInput.trim()}
-                className="flex-1 bg-primary-500 text-white py-2 rounded-lg hover:bg-primary-600 font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isLoading ? 'Starting...' : 'Start Custom Practice'}
-              </button>
-              <button
-                onClick={() => {
-                  setShowCustom(false)
-                  setCustomInput('')
-                }}
-                className="flex-1 bg-gray-200 text-gray-700 py-2 rounded-lg hover:bg-gray-300 font-medium transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
+     
       </div>
-
-      {/* Tips */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 className="font-semibold text-blue-900 mb-3">📚 Pro Tips</h3>
-        <ul className="space-y-2 text-blue-800 text-sm">
-          <li>• <strong>Speak naturally</strong> - Imagine talking to a real person</li>
-          <li>• <strong>Pause for responses</strong> - The AI needs time to respond</li>
-          <li>• <strong>Try different approaches</strong> - If something doesn't work, adjust your strategy</li>
-          <li>• <strong>Repeat exercises</strong> - Practice makes perfect. Try the same situation multiple times</li>
-          <li>• <strong>Create scenarios</strong> - Design custom situations based on real challenges you face</li>
-        </ul>
-      </div>
-    </div>
+    
   )
 }

@@ -21,126 +21,43 @@ const model = genAI.getGenerativeModel({
 
 
 // ─────────────────────────────────────────────────────────────
-// Practice Mode Context Templates
+// Core System Prompt
 // ─────────────────────────────────────────────────────────────
 
-const SITUATION_TEMPLATES = {
+const CORE_SYSTEM_PROMPT = `
+You are a conversation practice partner helping someone who is autistic practice real social conversations.
 
-  restaurant: {
-    title: "Ordering at a Restaurant",
-    systemPrompt: `
-You are a friendly restaurant waiter helping a customer order food.
+STRICT RULES FOR YOUR REPLY:
+- Maximum 2 sentences. No exceptions.
+- Be direct and literal. No idioms, no sarcasm, no implied meaning.
+- No filler phrases like "Great question!", "Absolutely!", "Of course!" — just the actual answer.
+- Use simple, clear words. Avoid ambiguous language.
+- If the user is practicing a scenario (job interview, ordering food, talking to a friend), stay in that scenario.
 
-Rules:
-- Keep responses VERY SHORT.
-- Maximum 1–2 sentences.
-- Ask only ONE question at a time.
-- Do NOT explain too much.
-- Avoid long descriptions.
-- Respond naturally like a real waiter.
-- Ask follow-up questions based on what the user says.
-- Do NOT repeat questions already asked.
-- Offer suggestions when helpful.
-- Keep responses conversational but informative.
-`,
-    initialMessage: "Welcome! What can I help you order today?",
-    scenarios: [
-      "Casual dining experience",
-      "Fine dining restaurant",
-      "Fast casual cafe"
-    ]
-  },
+STRICT RULES FOR SUGGESTIONS:
+- Give exactly 4 suggestions the user could say next.
+- Each suggestion must go in a DIFFERENT direction:
+  1. Continue / go deeper on the current topic
+  2. Ask a question back
+  3. Change or end the topic politely
+  4. Express a feeling or reaction
+- Suggestions must be short (under 10 words), natural, and ready to say out loud.
+- Base suggestions on the MOST RECENT part of the conversation — not generic fillers.
+- Never repeat a suggestion that was already used in this conversation.
 
-  job_interview: {
-    title: "Practice Job Interview",
-    systemPrompt: `
-You are a professional interviewer conducting a realistic job interview.
+Return ONLY valid JSON. No markdown. No explanation. No code blocks.
 
-Rules:
-- Keep responses VERY SHORT.
-- Maximum 1–2 sentences.
-- Ask only ONE question at a time.
-- Do NOT explain too much.
-- Avoid long descriptions.
-- Ask follow-up questions based on the candidate's response.
-- Encourage them to elaborate on experience and skills.
-- Keep responses professional but supportive.
-`,
-    initialMessage: "Thank you for coming in today. Could you introduce yourself?",
-    scenarios: [
-      "Software Engineer position",
-      "Customer Service role",
-      "Sales position"
-    ]
-  },
-
-  small_talk: {
-    title: "Small Talk Practice",
-    systemPrompt: `
-You are having casual small talk with someone new.
-
-Rules:
-- Keep responses VERY SHORT.
-- Maximum 1–2 sentences.
-- Ask only ONE question at a time.
-- Do NOT explain too much.
-- Avoid long descriptions.
-- Respond naturally and conversationally.
-- Ask follow-up questions about what the user says.
-- Keep the conversation flowing.
-`,
-    initialMessage: "Hi! How’s your day going?",
-    scenarios: [
-      "At a social event",
-      "Meeting new colleague",
-      "Coffee shop encounter"
-    ]
-  },
-
-  difficult_conversation: {
-    title: "Handle Difficult Conversation",
-    systemPrompt: `
-You are role-playing a difficult conversation.
-
-Rules:
-- Keep responses VERY SHORT.
-- Maximum 1–2 sentences.
-- Ask only ONE question at a time.
-- Do NOT explain too much.
-- Avoid long descriptions.
-- Respond empathetically.
-- Acknowledge feelings.
-- Ask thoughtful follow-up questions.
-- Encourage constructive communication.
-`,
-    initialMessage: "I wanted to talk about something that's been bothering me...",
-    scenarios: [
-      "Disagreement with friend",
-      "Feedback from colleague",
-      "Setting a boundary"
-    ]
-  },
-
-  custom: {
-    title: "Custom Situation",
-    systemPrompt: `
-You are role-playing in a custom social situation.
-
-Rules:
-- Keep responses VERY SHORT.
-- Maximum 1–2 sentences.
-- Ask only ONE question at a time.
-- Do NOT explain too much.
-- Avoid long descriptions.
-- Respond naturally.
-- Build on what the user says.
-- Ask thoughtful follow-up questions.
-`,
-    initialMessage: "I'm ready. Let's begin the practice!",
-    scenarios: []
-  }
-
+Format:
+{
+  "reply": "Direct reply in max 2 sentences.",
+  "suggestions": [
+    "Continue: ...",
+    "Ask: ...",
+    "Change topic: ...",
+    "React: ..."
+  ]
 }
+`
 
 
 // ─────────────────────────────────────────────────────────────
@@ -149,78 +66,90 @@ Rules:
 
 export async function generateAIResponse(
   userMessage,
-  conversationHistory,
+  conversationHistory = [],
   situationType = "custom",
   customContext = ""
 ) {
 
   try {
 
-    const template =
-      SITUATION_TEMPLATES[situationType] || SITUATION_TEMPLATES.custom
-
-
-    let systemPrompt = template.systemPrompt
+    let systemPrompt = CORE_SYSTEM_PROMPT
 
     if (customContext) {
-      systemPrompt += `\nAdditional context: ${customContext}`
+      systemPrompt += `\n\nScenario context: ${customContext}`
     }
 
-
-    // Build conversation history
+    // Build recent conversation history (last 6 turns = 3 exchanges)
     const historyText = conversationHistory
-      .slice(-10)
+      .slice(-6)
       .map(msg =>
         `${msg.sender === "user" ? "User" : "AI"}: ${msg.text}`
       )
       .join("\n")
 
-
     const prompt = `
-SYSTEM:
 ${systemPrompt}
 
-Conversation so far:
-${historyText}
+${historyText ? `Recent conversation:\n${historyText}\n` : ""}
+User just said: ${userMessage}
 
-User: ${userMessage}
-
-AI:
+Respond now.
 `
 
-
     console.log("🤖 Generating Gemini response...")
-    console.log("🧠 Prompt sent to Gemini:", prompt)
-
 
     const result = await model.generateContent(prompt)
-
     const response = await result.response
-    let aiResponse = response.text()
+    let text = response.text()
 
-    console.log("🤖 Gemini raw response:", aiResponse)
+    console.log("🤖 Raw Gemini response:", text)
 
-
-    // Clean formatting
-    aiResponse = aiResponse
-      .replace(/^AI:\s*/i, "")
-      .replace(/\n+/g, " ")
+    // Strip any accidental markdown fences
+    text = text
+      .replace(/```json/gi, "")
+      .replace(/```/g, "")
       .trim()
 
+    let parsed
 
-    console.log("✅ Gemini Response:", aiResponse)
+    try {
+      parsed = JSON.parse(text)
+    } catch (err) {
+      console.warn("⚠️ JSON parsing failed. Falling back.")
+      return getFallbackResponse(userMessage)
+    }
 
+    const reply = parsed.reply?.trim() || "I understand."
+
+    // Clean and validate suggestions
+    const rawSuggestions = Array.isArray(parsed.suggestions)
+      ? parsed.suggestions
+      : []
+
+    const suggestions = rawSuggestions
+      .slice(0, 4)
+      .map(s => String(s).trim())
+      .filter(s => s.length > 0)
+
+    // Pad to 4 if Gemini returned fewer
+    while (suggestions.length < 4) {
+      const defaults = getDefaultSuggestions()
+      const next = defaults.find(d => !suggestions.includes(d))
+      if (next) suggestions.push(next)
+      else break
+    }
 
     return {
-      response: aiResponse,
+      response: reply,
+      suggestions,
       isFallback: false
     }
 
   } catch (error) {
 
     console.error("❌ Gemini error:", error.message)
-
     return getFallbackResponse(userMessage)
+
   }
 
 }
@@ -230,31 +159,37 @@ AI:
 // Fallback Response
 // ─────────────────────────────────────────────────────────────
 
-function getFallbackResponse() {
+function getFallbackResponse(userMessage = "") {
 
-  const responses = [
-    "Tell me more about that.",
-    "That’s interesting. Can you elaborate?",
-    "I see. What happened next?",
-    "That makes sense. What else?",
-    "Go on, I’m listening.",
-    "Why do you think that?",
-    "Interesting perspective. Tell me more."
+  const replies = [
+    "I hear you.",
+    "That makes sense.",
+    "Thanks for telling me that.",
+    "I'm following along."
   ]
 
-  const response =
-    responses[Math.floor(Math.random() * responses.length)]
+  const response = replies[Math.floor(Math.random() * replies.length)]
 
   return {
     response,
+    suggestions: getDefaultSuggestions(),
     isFallback: true
   }
 
 }
 
+function getDefaultSuggestions() {
+  return [
+    "Can you say more about that?",
+    "Why do you think that is?",
+    "I'd like to change the topic.",
+    "That makes me feel curious."
+  ]
+}
+
 
 // ─────────────────────────────────────────────────────────────
-// Sarcasm Detection (lightweight heuristic)
+// Lightweight Sarcasm Detection
 // ─────────────────────────────────────────────────────────────
 
 export async function detectSarcasm(message) {
@@ -283,18 +218,12 @@ export async function detectSarcasm(message) {
 // Helpers
 // ─────────────────────────────────────────────────────────────
 
-export function getSituationTemplate(situationType) {
-  return SITUATION_TEMPLATES[situationType] || SITUATION_TEMPLATES.custom
-}
-
 export function getAvailableSituations() {
-
-  return Object.entries(SITUATION_TEMPLATES).map(
-    ([key, template]) => ({
-      id: key,
-      title: template.title,
-      scenarios: template.scenarios
-    })
-  )
-
+  return [
+    { id: "custom", title: "Free Conversation" },
+    { id: "job_interview", title: "Job Interview" },
+    { id: "ordering_food", title: "Ordering Food" },
+    { id: "meeting_someone", title: "Meeting Someone New" },
+    { id: "doctor_visit", title: "Doctor Visit" }
+  ]
 }

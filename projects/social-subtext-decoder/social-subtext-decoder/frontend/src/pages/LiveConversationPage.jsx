@@ -261,9 +261,9 @@ export default function LiveConversationPage() {
                 className="bg-primary-50 rounded-xl p-4 border border-primary-100"
               >
 
-                <p className="text-xs font-semibold text-primary-600 uppercase">
+                {/* <p className="text-xs font-semibold text-primary-600 uppercase">
                   💡 Interpretation
-                </p>
+                </p> */}
 
                 <p className="text-sm text-gray-900">
                   {lastResult.interpretation}
