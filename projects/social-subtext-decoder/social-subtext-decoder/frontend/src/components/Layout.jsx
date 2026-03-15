@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom'
-import { Brain, History, Sparkles, Camera } from 'lucide-react'
+import { Brain, History, Sparkles, Camera, Mic2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 export default function Layout() {
@@ -7,7 +7,7 @@ export default function Layout() {
     <div className="min-h-screen flex flex-col bg-soft-bg">
       {/* ── Navbar ── */}
       <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-soft-border">
-        <nav className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
+        <nav className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
 
           {/* Logo */}
           <div className="flex items-center gap-2.5">
@@ -34,6 +34,20 @@ export default function Layout() {
             >
               <Sparkles className="w-3.5 h-3.5" />
               Decode
+            </NavLink>
+
+            <NavLink
+              to="/practice"
+              className={({ isActive }) =>
+                `flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium transition-all duration-200
+                ${isActive
+                  ? 'bg-primary-50 text-primary-600'
+                  : 'text-soft-muted hover:text-gray-700 hover:bg-soft-border'
+                }`
+              }
+            >
+              <Mic2 className="w-3.5 h-3.5" />
+              Practice
             </NavLink>
 
             <NavLink
@@ -68,7 +82,7 @@ export default function Layout() {
       </header>
 
       {/* ── Page content ── */}
-      <main className="flex-1 max-w-3xl mx-auto w-full px-4 py-8">
+      <main className="flex-1 max-w-6xl mx-auto w-full px-4 py-8">
         <motion.div
           key={location.pathname}
           initial={{ opacity: 0, y: 12 }}

@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit'
 import dotenv from 'dotenv'
 import { createServer } from 'http'
 import { Server } from 'socket.io'
+import practiceRoutes from './routes/practice.js'
 
 import decodeRoutes from './routes/decode.js'
 import historyRoutes from './routes/history.js'
@@ -80,6 +81,7 @@ app.get('/health', (req, res) => {
 // ─── API Routes ────────────────────────────────────────────────
 app.use('/api/decode',  decodeLimiter, decodeRoutes)
 app.use('/api/history', historyRoutes)
+app.use('/api/practice', practiceRoutes)
 
 // ─── 404 Handler ───────────────────────────────────────────────
 app.use((req, res) => {
