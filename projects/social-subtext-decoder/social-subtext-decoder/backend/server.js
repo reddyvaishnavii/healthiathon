@@ -122,6 +122,10 @@ io.on('connection', (socket) => {
   const sessionId = socket.handshake.headers['x-session-id'] || socket.id
   
   console.log(`✅ Client connected: ${socket.id} (session: ${sessionId})`)
+  socket.emit("conversation:ready", {
+    success: true,
+    message: "Conversation session ready"
+  })
   
   // ── Conversation mode events ──
   socket.on('conversation:start', (data, callback) => {
@@ -177,7 +181,10 @@ httpServer.listen(PORT, () => {
   console.log(`\n🚀 Server running on http://localhost:${PORT}`)
   console.log(`📡 WebSocket: ws://localhost:${PORT}`)
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`)
-  console.log(`🔑 Claude API: ${process.env.ANTHROPIC_API_KEY ? '✅ configured' : '❌ MISSING'}`)
+  console.log(
+    "🔑 Gemini API:",
+    process.env.GEMINI_API_KEY ? "✅ Loaded" : "❌ MISSING"
+  );
   console.log(`🌐 Allowed origins: ${allowedOrigins.join(', ')}\n`)
 })
 

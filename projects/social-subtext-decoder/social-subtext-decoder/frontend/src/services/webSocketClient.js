@@ -1,12 +1,13 @@
 import { io } from 'socket.io-client'
 
+
 /**
  * WebSocket client for real-time conversation streaming
  * Manages connection, frame transmission, and result reception
  */
 class ConversationWebSocketClient {
   constructor(apiURL) {
-    this.url = apiURL || (import.meta.env.VITE_API_URL || '/api').replace('/api', '')
+    this.url = apiURL || (import.meta.env.VITE_API_URL || "http://localhost:3001")
     this.socket = null
     this.sessionId = null
     this.isConnected = false
