@@ -120,6 +120,81 @@ const io = new Server(httpServer, {
   },
 })
 
+function getSuggestions(emotion) {
+
+  const e = emotion?.toLowerCase()
+
+  switch (e) {
+
+    case 'sad':
+      return [
+        "I had a rough day",
+        "Something stressful happened",
+        "I'm feeling a bit down"
+      ]
+
+    case 'happy':
+      return [
+        "Something good happened today",
+        "I'm feeling great today",
+        "I'm excited about something"
+      ]
+
+    case 'angry':
+      return [
+        "Something really annoyed me",
+        "I'm frustrated about something",
+        "I need to calm down"
+      ]
+
+    case 'surprised':
+      return [
+        "That was unexpected",
+        "Something surprising happened",
+        "I didn't see that coming"
+      ]
+
+    default:
+      return [
+        "Can you tell me more?",
+        "I understand",
+        "That makes sense"
+      ]
+
+  }
+}
+function interpretEmotion(emotion) {
+
+  const e = emotion?.toLowerCase()
+
+  switch (e) {
+
+    case 'happy':
+    case 'joy':
+      return 'You look happy and relaxed.'
+
+    case 'sad':
+      return 'You seem a little sad. Try relaxing your face.'
+
+    case 'angry':
+      return 'Your expression looks tense.'
+
+    case 'surprised':
+      return 'You look surprised.'
+
+    case 'fear':
+      return 'You seem nervous or uncomfortable.'
+
+    case 'disgust':
+      return 'Your expression suggests discomfort.'
+
+    case 'neutral':
+      return 'Your face looks calm and neutral.'
+
+    default:
+      return `Emotion detected: ${emotion}`
+  }
+}
 // ─── WebSocket Event Handlers ──────────────────────────────────
 io.on('connection', (socket) => {
   const sessionId = socket.handshake.headers['x-session-id'] || socket.id
@@ -138,6 +213,7 @@ io.on('connection', (socket) => {
   })
   
   socket.on('frame:send', (data, callback) => {
+    console.log("📥 Frame data received:", data)
     // data = { videoFrame: base64, audioChunk: PCMdata, timestamp }
     console.log(`📥 Frame received:`, {
       sessionId,
@@ -149,13 +225,17 @@ io.on('connection', (socket) => {
     
     // TODO: Process frame through emotion + speech services
     // For now, send dummy response
-    socket.emit('frame:processed', {
-      emotion: { label: 'Happy', confidence: 0.85 },
-      tone: { label: 'Friendly' },
-      interpretation: 'The person seems happy and friendly.',
-      suggestedResponses: ['That sounds great!', 'I appreciate that.'],
-      latency: Math.random() * 500 + 100
-    })
+    const detectedEmotion = (data.emotion || 'neutral').toLowerCase()
+    console.log("Detected emotion from client:", detectedEmotion)
+
+
+socket.emit('frame:processed', {
+  emotion: { label: detectedEmotion },
+  tone: { label: 'neutral' },
+  // interpretation: interpretEmotion(detectedEmotion),
+  suggestedResponses: getSuggestions(detectedEmotion),
+  latency: Math.random() * 500 + 100
+})
     
     if (callback) callback({ success: true })
   })

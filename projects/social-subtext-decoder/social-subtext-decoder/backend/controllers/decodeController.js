@@ -140,7 +140,7 @@ export const decodePhrase = async (req, res) => {
       })
     }
 
-    console.error('❌ Claude API error:', err.message)
+    // console.error('❌ Claude API error:', err.message)
     return res.status(500).json({
       success: false,
       error: 'Something went wrong. Please try again.',
