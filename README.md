@@ -127,8 +127,8 @@ Frontend:
 ### ⚙️ Installation and Setup
 
 1. Clone the Repository
-git clone https://github.com/reddyvaishnavii/healthiathon.git
-cd healthiathon/projects/social-subtext-decoder/social-subtext-decoder
+git clone https://github.com/reddyvaishnavii/social-subtext-decoder.git
+cd social-subtext-decoder/projects/social-subtext-decoder/social-subtext-decoder
 2. Install Backend Dependencies
 cd backend
 npm install
